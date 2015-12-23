@@ -25,9 +25,6 @@
 
 #include <hardware/sensors.h>
 
-#include <binder/AppOpsManager.h>
-#include <binder/IServiceManager.h>
-
 #include <gui/Sensor.h>
 #include <log/log.h>
 
@@ -60,8 +57,8 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
     // Set fifo event count zero for older devices which do not support batching. Fused
     // sensors also have their fifo counts set to zero.
     if (halVersion > SENSORS_DEVICE_API_VERSION_1_0) {
-        mFifoReservedEventCount = hwSensor->fifoReservedEventCount;
-        mFifoMaxEventCount = hwSensor->fifoMaxEventCount;
+        mFifoReservedEventCount = static_cast<int32_t>(hwSensor->fifoReservedEventCount);
+        mFifoMaxEventCount = static_cast<int32_t>(hwSensor->fifoMaxEventCount);
     } else {
         mFifoReservedEventCount = 0;
         mFifoMaxEventCount = 0;
@@ -116,15 +113,11 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
         mStringType = SENSOR_STRING_TYPE_GYROSCOPE_UNCALIBRATED;
         mFlags |= SENSOR_FLAG_CONTINUOUS_MODE;
         break;
-    case SENSOR_TYPE_HEART_RATE: {
+    case SENSOR_TYPE_HEART_RATE:
         mStringType = SENSOR_STRING_TYPE_HEART_RATE;
-#ifndef NO_SENSOR_PERMISSION_CHECK
         mRequiredPermission = SENSOR_PERMISSION_BODY_SENSORS;
-        AppOpsManager appOps;
-        mRequiredAppOp = appOps.permissionToOpCode(String16(SENSOR_PERMISSION_BODY_SENSORS));
-#endif
         mFlags |= SENSOR_FLAG_ON_CHANGE_MODE;
-        } break;
+        break;
     case SENSOR_TYPE_LIGHT:
         mStringType = SENSOR_STRING_TYPE_LIGHT;
         mFlags |= SENSOR_FLAG_ON_CHANGE_MODE;
@@ -211,13 +204,6 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
             mFlags |= SENSOR_FLAG_WAKE_UP;
         }
         break;
-    case SENSOR_TYPE_WRIST_TILT_GESTURE:
-        mStringType = SENSOR_STRING_TYPE_WRIST_TILT_GESTURE;
-        mFlags |= SENSOR_FLAG_SPECIAL_REPORTING_MODE;
-        if (halVersion < SENSORS_DEVICE_API_VERSION_1_3) {
-            mFlags |= SENSOR_FLAG_WAKE_UP;
-        }
-        break;
     default:
         // Only pipe the stringType, requiredPermission and flags for custom sensors.
         if (halVersion > SENSORS_DEVICE_API_VERSION_1_0 && hwSensor->stringType) {
@@ -226,15 +212,11 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
 #ifndef NO_SENSOR_PERMISSION_CHECK
         if (halVersion > SENSORS_DEVICE_API_VERSION_1_0 && hwSensor->requiredPermission) {
             mRequiredPermission = hwSensor->requiredPermission;
-            if (!strcmp(mRequiredPermission, SENSOR_PERMISSION_BODY_SENSORS)) {
-                AppOpsManager appOps;
-                mRequiredAppOp = appOps.permissionToOpCode(String16(SENSOR_PERMISSION_BODY_SENSORS));
-            }
         }
 #endif
 
         if (halVersion >= SENSORS_DEVICE_API_VERSION_1_3) {
-            mFlags = static_cast<uint32_t>(hwSensor->flags);
+            mFlags = static_cast<int32_t>(hwSensor->flags);
         } else {
             // This is an OEM defined sensor on an older HAL. Use minDelay to determine the
             // reporting mode of the sensor.
@@ -249,16 +231,11 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
         break;
     }
 
-    // Set DATA_INJECTION flag here. Defined in HAL 1_4.
-    if (halVersion >= SENSORS_DEVICE_API_VERSION_1_4) {
-        mFlags |= (hwSensor->flags & DATA_INJECTION_MASK);
-    }
-
     // For the newer HALs log errors if reporting mask flags are set incorrectly.
     if (halVersion >= SENSORS_DEVICE_API_VERSION_1_3) {
         // Wake-up flag is set here.
         mFlags |= (hwSensor->flags & SENSOR_FLAG_WAKE_UP);
-        if (mFlags != hwSensor->flags) {
+        if (mFlags != static_cast<int32_t>(hwSensor->flags)) {
             int actualReportingMode =
                  (hwSensor->flags & REPORTING_MODE_MASK) >> REPORTING_MODE_SHIFT;
             int expectedReportingMode = (mFlags & REPORTING_MODE_MASK) >> REPORTING_MODE_SHIFT;
@@ -270,6 +247,7 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
 
         }
     }
+<<<<<<< HEAD
 
 #ifndef NO_SENSOR_PERMISSION_CHECK
     if (mRequiredPermission.length() > 0) {
@@ -283,6 +261,8 @@ Sensor::Sensor(struct sensor_t const* hwSensor, int halVersion)
         }
     }
 #endif
+=======
+>>>>>>> 8f52efb... Fix compatibility with prebuilt 5.0 libsensorservice
 }
 
 Sensor::~Sensor()
@@ -333,11 +313,11 @@ int32_t Sensor::getVersion() const {
     return mVersion;
 }
 
-uint32_t Sensor::getFifoReservedEventCount() const {
+int32_t Sensor::getFifoReservedEventCount() const {
     return mFifoReservedEventCount;
 }
 
-uint32_t Sensor::getFifoMaxEventCount() const {
+int32_t Sensor::getFifoMaxEventCount() const {
     return mFifoMaxEventCount;
 }
 
@@ -349,19 +329,11 @@ const String8& Sensor::getRequiredPermission() const {
     return mRequiredPermission;
 }
 
-bool Sensor::isRequiredPermissionRuntime() const {
-    return mRequiredPermissionRuntime;
-}
-
-int32_t Sensor::getRequiredAppOp() const {
-    return mRequiredAppOp;
-}
-
 int32_t Sensor::getMaxDelay() const {
     return mMaxDelay;
 }
 
-uint32_t Sensor::getFlags() const {
+int32_t Sensor::getFlags() const {
     return mFlags;
 }
 
@@ -378,8 +350,7 @@ size_t Sensor::getFlattenedSize() const
     size_t fixedSize =
             sizeof(int32_t) * 3 +
             sizeof(float) * 4 +
-            sizeof(int32_t) * 6 +
-            sizeof(bool);
+            sizeof(int32_t) * 5;
 
     size_t variableSize =
             sizeof(uint32_t) + FlattenableUtils::align<4>(mName.length()) +
@@ -409,8 +380,6 @@ status_t Sensor::flatten(void* buffer, size_t size) const {
     FlattenableUtils::write(buffer, size, mFifoMaxEventCount);
     flattenString8(buffer, size, mStringType);
     flattenString8(buffer, size, mRequiredPermission);
-    FlattenableUtils::write(buffer, size, mRequiredPermissionRuntime);
-    FlattenableUtils::write(buffer, size, mRequiredAppOp);
     FlattenableUtils::write(buffer, size, mMaxDelay);
     FlattenableUtils::write(buffer, size, mFlags);
     return NO_ERROR;
@@ -449,8 +418,6 @@ status_t Sensor::unflatten(void const* buffer, size_t size) {
     if (!unflattenString8(buffer, size, mRequiredPermission)) {
         return NO_MEMORY;
     }
-    FlattenableUtils::read(buffer, size, mRequiredPermissionRuntime);
-    FlattenableUtils::read(buffer, size, mRequiredAppOp);
     FlattenableUtils::read(buffer, size, mMaxDelay);
     FlattenableUtils::read(buffer, size, mFlags);
     return NO_ERROR;
